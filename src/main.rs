@@ -31,10 +31,8 @@ fn main() {
         panic!("couldn't read {}: {}", display, why.description());
     }
 
-    let mut lexer = lexer::Lexer::new(&s);
-    loop {
-        match lexer.next() {
-            Err(error) if error.kind == lexer::ErrorKind::Eof => return,
+    for lexer_result in lexer::Lexer::new(&s) {
+        match lexer_result {
             Err(error) => {
                 println!("Error: {}", error);
                 return;
