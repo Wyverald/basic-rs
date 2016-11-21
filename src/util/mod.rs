@@ -1,5 +1,6 @@
+use std::fmt;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Position {
     pub line: u32,
     pub col: u32,
@@ -20,5 +21,11 @@ impl Position {
     pub fn next_line(&mut self) {
         self.line += 1;
         self.col = 0;
+    }
+}
+
+impl fmt::Display for Position {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "{}:{}", self.line, self.col)
     }
 }
