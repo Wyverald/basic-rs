@@ -1,4 +1,6 @@
+mod ast;
 mod lexer;
+mod parser;
 mod util;
 
 use std::env;
@@ -31,15 +33,28 @@ fn main() {
         panic!("couldn't read {}: {}", display, why.description());
     }
 
+    let mut tokens = vec!();
     for lexer_result in lexer::Lexer::new(&s) {
         match lexer_result {
             Err(error) => {
-                println!("Error: {}", error);
+                println!("{}", error);
                 return;
-            }
+            },
             Ok(token) => {
                 println!("Token: {}", token);
-            }
+                tokens.push(token);
+            },
         }
     }
+
+    let mut parser = parser::Parser::new(tokens);
+    match parser.run() {
+        Err(error) => {
+            println!("{}", error);
+            return;
+        },
+        Ok(ast) => {
+            println!("Ast: {:#?}", ast);
+        },
+    };
 }

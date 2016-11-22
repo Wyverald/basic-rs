@@ -1,8 +1,9 @@
 mod token;
 
+pub use lexer::token::Keyword;
 pub use lexer::token::Token;
+pub use lexer::token::TokenContent;
 
-use lexer::token::TokenKind;
 use std::fmt;
 use std::str;
 use util::Position;
@@ -57,16 +58,8 @@ impl<'a> Lexer<'a> {
         Err(Error { kind: error_kind, position: self.cur_position })
     }
 
-    pub fn next(&mut self) -> Result<Token, Error> {
-        loop {
-            if let Some(ch) = self.cur_char {
-                if ch != ' ' { break }
-                self.next_char();
-            } else {
-                return self.make_error(ErrorKind::Eof);
-            }
-        }
-
+    // Should only be called when there is a next character.
+    fn next_token(&mut self) -> Result<Token, Error> {
         let ch = self.cur_char.unwrap();
         let cur_position = self.cur_position;
         match ch {
@@ -88,41 +81,60 @@ impl<'a> Lexer<'a> {
                 }
                 if s == "." {
                     // If we only got one dot, it's an operator.
-                    return Ok(Token::new(TokenKind::Operator, s, cur_position));
+                    return Ok(Token::new(TokenContent::Dot, cur_position));
                 }
-                return Ok(Token::new(TokenKind::Number, s, cur_position));
+                let content = if has_dot {
+                    TokenContent::FloatLiteral(s.parse().unwrap())
+                } else {
+                    TokenContent::IntegerLiteral(s.parse().unwrap())
+                };
+                return Ok(Token::new(content, cur_position));
             }
 
-            'A' ... 'Z' => {
+            'A' ... 'Z' | '$' => {
                 // Identifier or keyword
                 let mut s = String::new();
                 s.push(ch);
                 while let Some(ch) = self.next_char() {
                     match ch {
-                        '0'...'9'|'A'...'Z' => s.push(ch),
+                        '0'...'9'|'A'...'Z'|'$' => s.push(ch),
                         _ => break,
                     }
                 }
-                return Ok(Token::new(TokenKind::Identifier, s, cur_position));
+                return Ok(Token::new(TokenContent::keyword_or_identifier(s), cur_position));
             }
 
-            '(' | ')' | '=' | ';' | '+' | '-' | '*' | '/' | ':' => {
-                // Single-character operator
-                let mut s = String::new();
-                s.push(ch);
+            '(' | ')' | '=' | ';' | '+' | '-' | '*' | '/' | ':' | ',' | '\n' => {
+                // Single-character symbol
+                let content = match ch {
+                    '(' => TokenContent::LeftParens,
+                    ')' => TokenContent::RightParens,
+                    '=' => TokenContent::Equals,
+                    ';' => TokenContent::Semicolon,
+                    '+' => TokenContent::Plus,
+                    '-' => TokenContent::Minus,
+                    '*' => TokenContent::Asterisk,
+                    '/' => TokenContent::Slash,
+                    ':' => TokenContent::Colon,
+                    ',' => TokenContent::Comma,
+                    '\n' => TokenContent::NewLine,
+                    _ => unreachable!(),
+                };
                 self.next_char();
-                return Ok(Token::new(TokenKind::Operator, s, cur_position));
+                return Ok(Token::new(content, cur_position));
             }
 
             '<' | '>' => {
-                // Potentially double-character operator
-                let mut s = String::new();
-                s.push(ch);
-                if self.next_char() == Some('=') {
-                    s.push('=');
+                // Potentially double-character symbol
+                let content = if self.next_char() == Some('=') {
                     self.next_char();
-                }
-                return Ok(Token::new(TokenKind::Operator, s, cur_position));
+                    if ch == '<' { TokenContent::LeftDoubleArrow }
+                    else { TokenContent::RightDoubleArrow }
+                } else {
+                    if ch == '<' { TokenContent::LessThan }
+                    else { TokenContent::GreaterThan }
+                };
+                return Ok(Token::new(content, cur_position));
             }
 
             '"' => {
@@ -140,12 +152,7 @@ impl<'a> Lexer<'a> {
                     }
                 }
                 self.next_char();
-                return Ok(Token::new(TokenKind::String, s, cur_position));
-            }
-
-            '\n' => {
-                self.next_char();
-                return Ok(Token::new(TokenKind::NewLine, String::new(), cur_position));
+                return Ok(Token::new(TokenContent::StringLiteral(s), cur_position));
             }
 
             _ => {
@@ -156,9 +163,25 @@ impl<'a> Lexer<'a> {
     }
 }
 
+impl<'a> Iterator for Lexer<'a> {
+    type Item = Result<Token, Error>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            if let Some(ch) = self.cur_char {
+                if ch != ' ' { break }
+                self.next_char();
+            } else {
+                return None;
+            }
+        }
+
+        Some(self.next_token())
+    }
+}
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum ErrorKind {
-    Eof,
     EofInStringLiteral,
     EolInStringLiteral,
     TooManyDotsInNumberLiteral,
@@ -173,6 +196,6 @@ pub struct Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "Error at {}: {:?}", self.position, self.kind)
+        write!(f, "Lexer error at {}: {:?}", self.position, self.kind)
     }
 }

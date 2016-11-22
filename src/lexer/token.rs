@@ -1,41 +1,78 @@
 use std::fmt;
 use util::Position;
 
-#[allow(dead_code)]
-enum Keyword {
-    DEF,
-    END,
-    FOR,
-    IF,
-    LET,
-    NEXT,
-    PRINT,
-    STEP,
-    THEN,
-    TO,
-}
-
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum TokenKind {
-    Identifier,
-    NewLine,
-    Number,
-    Operator,
-    String,
+pub enum Keyword {
+    Def,
+    Else,
+    End,
+    For,
+    GoTo,
+    If,
+    Let,
+    Next,
+    Print,
+    Step,
+    Then,
+    To,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
+pub enum TokenContent {
+    Asterisk,
+    Colon,
+    Comma,
+    Dot,
+    Equals,
+    FloatLiteral(f32),
+    GreaterThan,
+    Keyword(Keyword),
+    Identifier(String),
+    IntegerLiteral(u32),
+    LeftDoubleArrow,
+    LeftParens,
+    LessThan,
+    Minus,
+    NewLine,
+    Plus,
+    RightDoubleArrow,
+    RightParens,
+    Semicolon,
+    Slash,
+    StringLiteral(String),
+}
+
+impl TokenContent {
+    pub fn keyword_or_identifier(repr: String) -> TokenContent {
+        let keyword = match repr.as_str() {
+            "DEF" => Keyword::Def,
+            "ELSE" => Keyword::Else,
+            "END" => Keyword::End,
+            "FOR" => Keyword::For,
+            "GOTO" => Keyword::GoTo,
+            "IF" => Keyword::If,
+            "LET" => Keyword::Let,
+            "NEXT" => Keyword::Next,
+            "PRINT" => Keyword::Print,
+            "STEP" => Keyword::Step,
+            "THEN" => Keyword::Then,
+            "TO" => Keyword::To,
+            _ => return TokenContent::Identifier(repr),
+        };
+        TokenContent::Keyword(keyword)
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct Token {
-    kind: TokenKind,
-    repr: String,
-    position: Position,
+    pub content: TokenContent,
+    pub position: Position,
 }
 
 impl Token {
-    pub fn new(kind: TokenKind, repr: String, position: Position) -> Token {
+    pub fn new(content: TokenContent, position: Position) -> Token {
         Token {
-            kind: kind,
-            repr: repr,
+            content: content,
             position: position,
         }
     }
@@ -43,6 +80,6 @@ impl Token {
 
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "{:?} at {} [{}]", self.kind, self.position, self.repr)
+        write!(f, "Token at {}: {:?}", self.position, self.content)
     }
 }
