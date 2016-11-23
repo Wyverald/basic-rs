@@ -101,11 +101,20 @@ impl<'a> Lexer<'a> {
                         _ => break,
                     }
                 }
+                if &s == "REM" {
+                    while let Some(ch) = self.cur_char {
+                        match ch {
+                            '\n' => break,
+                            _ => { self.next_char(); },
+                        }
+                    }
+                    return Ok(Token::new(TokenContent::Rem, cur_position));
+                }
                 return Ok(Token::new(TokenContent::keyword_or_identifier(s), cur_position));
             }
 
-            '(' | ')' | '=' | ';' | '+' | '-' | '*' | '/' | ':' | ',' | '\n' => {
-                // Single-character symbol
+            '(' | ')' | '=' | ';' | '+' | '-' | '*' | '/' | ':' | ',' | '<' | '>' | '\n' => {
+                // Symbol
                 let content = match ch {
                     '(' => TokenContent::LeftParens,
                     ')' => TokenContent::RightParens,
@@ -117,23 +126,12 @@ impl<'a> Lexer<'a> {
                     '/' => TokenContent::Slash,
                     ':' => TokenContent::Colon,
                     ',' => TokenContent::Comma,
+                    '<' => TokenContent::LessThan,
+                    '>' => TokenContent::GreaterThan,
                     '\n' => TokenContent::NewLine,
                     _ => unreachable!(),
                 };
                 self.next_char();
-                return Ok(Token::new(content, cur_position));
-            }
-
-            '<' | '>' => {
-                // Potentially double-character symbol
-                let content = if self.next_char() == Some('=') {
-                    self.next_char();
-                    if ch == '<' { TokenContent::LeftDoubleArrow }
-                    else { TokenContent::RightDoubleArrow }
-                } else {
-                    if ch == '<' { TokenContent::LessThan }
-                    else { TokenContent::GreaterThan }
-                };
                 return Ok(Token::new(content, cur_position));
             }
 

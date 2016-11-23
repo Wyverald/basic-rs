@@ -39,11 +39,14 @@ pub enum Statement {
         then_branch: Box<Statement>,
         else_branch: Option<Box<Statement>>,
     },
+    Input(Identifier),
     Let(Identifier, Expression),
     Next {
         for_index: StatementIndex,
     },
+    NoOp,
     Print(Vec<PrintExpr>),
+    Stop,
 }
 
 #[derive(Clone, Debug)]
@@ -82,6 +85,7 @@ pub enum BinaryOperator {
     Plus,
     Minus,
     Multiply,
+    Unequal,
 }
 
 #[derive(Debug)]

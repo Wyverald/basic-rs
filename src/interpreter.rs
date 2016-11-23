@@ -1,6 +1,10 @@
+extern crate rand;
+
 use ast::*;
 use std::collections::HashMap;
 use std::fmt;
+use std::io;
+use std::io::Write;
 use std::mem;
 use std::ops;
 
@@ -56,6 +60,7 @@ impl Environment {
                 Ok(ExecutionResult::NextStatement)
             },
             &Statement::End => Ok(ExecutionResult::End),
+            &Statement::Stop => Ok(ExecutionResult::Stop),
             &Statement::Let(ref identifier, ref expr) => {
                 let value = self.evaluate(ast, expr)?;
                 self.vars.insert(identifier.name.clone(), value);
@@ -75,6 +80,30 @@ impl Environment {
                     }
                 }
             },
+            &Statement::Input(ref variable) => {
+                let val = {
+                    let val: Value;
+                    loop {
+                        print!("?");
+                        io::stdout().flush().expect("toilet stuck, could not flush");
+                        let mut s = String::new();
+                        io::stdin().read_line(&mut s).expect("failed to read from stdin");
+                        let trimmed = s.trim();
+                        match trimmed.parse::<i32>() {
+                            Ok(i) => { val = Value::Integer(i); break }
+                            Err(_) => match trimmed.parse::<f64>() {
+                                Ok(f) => { val = Value::Float(f); break }
+                                Err(_) => print!("?Redo from start"),
+                            }
+                        }
+                    }
+                    val
+                };
+                self.column = 0;
+                self.vars.insert(variable.name.clone(), val);
+                Ok(ExecutionResult::NextStatement)
+            },
+            &Statement::NoOp => Ok(ExecutionResult::NextStatement),
             &Statement::For { ref variable, ref from, to: _, step: _ } => {
                 let from_val = self.evaluate(ast, from)?;
                 self.vars.insert(variable.name.clone(), from_val);
@@ -124,6 +153,7 @@ impl Environment {
                     BinaryOperator::Minus => val1 - val2,
                     BinaryOperator::Multiply => val1 * val2,
                     BinaryOperator::Plus => val1 + val2,
+                    BinaryOperator::Unequal => val1.ne(val2),
                 })
             },
             &Expression::Unary(un_op, ref expr) => {
@@ -168,6 +198,13 @@ impl Environment {
                             }
                         }
                     },
+                    "RND" => {
+                        if arguments.len() != 1 {
+                            Err(Error("too many arguments"))
+                        } else {
+                            Ok(Value::Float(rand::random()))
+                        }
+                    }
                     "SQR" => {
                         if arguments.len() != 1 {
                             Err(Error("too many arguments"))
@@ -271,6 +308,14 @@ impl Value {
         }
     }
 
+    fn ne(self, other: Value) -> Value {
+        if let (Some(l), Some(r)) = (self.to_float(), other.to_float()) {
+            Value::from_bool(l != r)
+        } else {
+            Value::from_bool(self.to_string() != other.to_string())
+        }
+    }
+
     fn le(self, other: Value) -> Value {
         if let (Some(l), Some(r)) = (self.to_float(), other.to_float()) {
             Value::from_bool(l <= r)
@@ -363,8 +408,8 @@ impl ops::AddAssign for Value {
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match self {
-            &Value::Integer(i) => write!(f, "{}", i),
-            &Value::Float(fl) => write!(f, "{}", fl),
+            &Value::Integer(i) => write!(f, " {} ", i),
+            &Value::Float(fl) => write!(f, " {} ", fl),
             &Value::String(ref s) => write!(f, "{}", s),
         }
     }
@@ -372,6 +417,7 @@ impl fmt::Display for Value {
 
 enum ExecutionResult {
     End,
+    Stop,
     NextStatement,
     GoTo(StatementIndex),
 }
@@ -397,10 +443,12 @@ impl Interpreter {
     pub fn step(&mut self) -> Result<bool, Error> {
         let ref statement = self.ast.statements[self.environment.pc.0];
         let result = self.environment.execute(&self.ast, statement)?;
+        //println!("Executing {}", self.environment.pc.0);
         self.environment.pc = match result {
             ExecutionResult::NextStatement => self.environment.pc.next(),
             ExecutionResult::GoTo(stmt_idx) => stmt_idx,
             ExecutionResult::End => return Ok(false),
+            ExecutionResult::Stop => return Ok(false),
         };
         Ok(true)
     }

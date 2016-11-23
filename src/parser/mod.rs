@@ -204,6 +204,10 @@ impl<I: Iterator<Item=Token>> Parser<I> {
                     else_branch: else_branch.map(Box::new),
                 })
             },
+            TokenContent::Keyword(Keyword::Input) => {
+                let variable = self.expect_identifier()?;
+                Ok(Statement::Input(variable))
+            }
             TokenContent::Keyword(Keyword::For) => {
                 let variable = self.expect_identifier()?;
                 self.expect_simple_token(TokenContent::Equals)?;
@@ -248,6 +252,8 @@ impl<I: Iterator<Item=Token>> Parser<I> {
 
                 }
             }
+            TokenContent::Rem => Ok(Statement::NoOp),
+            TokenContent::Keyword(Keyword::Stop) => Ok(Statement::Stop),
             _ => return Err(Error::unexpected_token(token, "expected statement")),
         }
     }
@@ -258,20 +264,42 @@ impl<I: Iterator<Item=Token>> Parser<I> {
         Ok(Statement::Let(ident, expr))
     }
 
-    // Expression = Choice (("<"|">"|"="|"<="|">=") Choice)?
+    // Expression = Choice (("<"|">"|"="|("<" "=")|(">" "=")|("<" ">")) Choice)?
     fn parse_expression(&mut self) -> Result<Expression, Error> {
         let choice = self.parse_choice()?;
         let opt_operator = match self.peek_token()?.content {
-            TokenContent::LessThan => Some(BinaryOperator::LessThan),
-            TokenContent::GreaterThan => Some(BinaryOperator::GreaterThan),
-            TokenContent::Equals => Some(BinaryOperator::Equals),
-            TokenContent::LeftDoubleArrow => Some(BinaryOperator::LessThanOrEqualTo),
-            TokenContent::RightDoubleArrow => Some(BinaryOperator::GreaterThanOrEqualTo),
+            TokenContent::LessThan => {
+                self.next_token()?;
+                match self.peek_token()?.content {
+                    TokenContent::GreaterThan => {
+                        self.next_token()?;
+                        Some(BinaryOperator::Unequal)
+                    },
+                    TokenContent::Equals => {
+                        self.next_token()?;
+                        Some(BinaryOperator::LessThanOrEqualTo)
+                    },
+                    _ => Some(BinaryOperator::LessThan)
+                }
+            },
+            TokenContent::GreaterThan => {
+                self.next_token()?;
+                match self.peek_token()?.content {
+                    TokenContent::Equals => {
+                        self.next_token()?;
+                        Some(BinaryOperator::GreaterThanOrEqualTo)
+                    },
+                    _ => Some(BinaryOperator::GreaterThan)
+                }
+            },
+            TokenContent::Equals => {
+                self.next_token()?;
+                Some(BinaryOperator::Equals)
+            },
             _ => None,
         };
         match opt_operator {
             Some(operator) => {
-                self.next_token()?;
                 Ok(Expression::Binary(operator, Box::new(choice), Box::new(self.parse_choice()?)))
             },
             None => Ok(choice),
