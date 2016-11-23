@@ -1,4 +1,5 @@
 mod ast;
+mod interpreter;
 mod lexer;
 mod parser;
 mod util;
@@ -47,14 +48,26 @@ fn main() {
         }
     }
 
-    let mut parser = parser::Parser::new(tokens);
-    match parser.run() {
+    let parser = parser::Parser::new(tokens);
+    let ast = match parser.run() {
         Err(error) => {
             println!("{}", error);
             return;
         },
         Ok(ast) => {
             println!("Ast: {:#?}", ast);
+            ast
         },
     };
+
+    let mut interpreter = interpreter::Interpreter::new(ast);
+    match interpreter.run() {
+        Err(error) => {
+            println!("{:?}", error);
+            return;
+        },
+        Ok(()) => {
+            println!("YYYYYYYYYEEEEEESSSSSSSS");
+        }
+    }
 }

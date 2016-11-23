@@ -7,6 +7,12 @@ pub struct LineNumber(pub u32);
 #[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct StatementIndex(pub usize);
 
+impl StatementIndex {
+    pub fn next(self) -> StatementIndex {
+        StatementIndex(self.0 + 1)
+    }
+}
+
 #[derive(Debug)]
 pub struct Ast {
     pub statements: Vec<Statement>,
@@ -15,9 +21,9 @@ pub struct Ast {
 
 #[derive(Debug)]
 pub enum Statement {
-    Definition {
+    Def {
         name: Identifier,
-        arguments: Vec<Identifier>,
+        parameters: Vec<Identifier>,
         body: Expression,
     },
     End,
@@ -49,8 +55,8 @@ pub struct Identifier {
 #[derive(Debug)]
 pub enum Expression {
     StringLiteral(String),
-    IntegerLiteral(u32),
-    FloatLiteral(f32),
+    IntegerLiteral(i32),
+    FloatLiteral(f64),
     Identifier(Identifier),
     Unary(UnaryOperator, Box<Expression>),
     Binary(BinaryOperator, Box<Expression>, Box<Expression>),
@@ -60,12 +66,12 @@ pub enum Expression {
     },
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum UnaryOperator {
     Minus,
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum BinaryOperator {
     Divide,
     Equals,

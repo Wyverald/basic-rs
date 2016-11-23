@@ -30,11 +30,11 @@ impl<I: Iterator<Item=Token>> Parser<I> {
         }
     }
 
-    pub fn run(&mut self) -> Result<&Ast, Error> {
+    pub fn run(mut self) -> Result<Ast, Error> {
         while let Some(_) = self.input.peek() {
             self.parse_line()?
         }
-        Ok(&self.ast)
+        Ok(self.ast)
     }
 
     fn next_token(&mut self) -> Result<Token, Error> {
@@ -62,7 +62,7 @@ impl<I: Iterator<Item=Token>> Parser<I> {
     fn expect_line_number(&mut self) -> Result<LineNumber, Error> {
         let token = self.next_token()?;
         match token.content {
-            TokenContent::IntegerLiteral(num) => Ok(LineNumber(num)),
+            TokenContent::IntegerLiteral(num) => Ok(LineNumber(num as u32)),
             _ => Err(Error::unexpected_token(token, "expected a line number")),
         }
     }
@@ -162,9 +162,9 @@ impl<I: Iterator<Item=Token>> Parser<I> {
                 }
                 self.expect_simple_token(TokenContent::Equals)?;
                 let expr = self.parse_expression()?;
-                Ok(Statement::Definition {
+                Ok(Statement::Def {
                     name: identifier,
-                    arguments: arguments,
+                    parameters: arguments,
                     body: expr,
                 })
             },
