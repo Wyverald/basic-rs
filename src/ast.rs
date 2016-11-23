@@ -40,7 +40,7 @@ pub enum Statement {
     Print(Vec<PrintExpr>),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Identifier {
     pub name: String,
     pub position: Position,

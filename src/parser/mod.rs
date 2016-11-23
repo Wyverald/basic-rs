@@ -10,6 +10,12 @@ use util::Position;
 pub struct Parser<I: Iterator<Item=Token>> {
     input: Peekable<I>,
     ast: Ast,
+    for_stack: Vec<ForStatement>,
+}
+
+struct ForStatement {
+    index: StatementIndex,
+    variable: Identifier,
 }
 
 impl<I: Iterator<Item=Token>> Parser<I> {
@@ -20,6 +26,7 @@ impl<I: Iterator<Item=Token>> Parser<I> {
                 statements: vec!(),
                 line_numbers: HashMap::new(),
             },
+            for_stack: vec!(),
         }
     }
 
@@ -80,6 +87,17 @@ impl<I: Iterator<Item=Token>> Parser<I> {
 
         loop {
             let statement = self.parse_statement()?;
+            if let &Statement::For {
+                variable: ref identifier,
+                from: _,
+                to: _,
+                step: _,
+            } = &statement {
+                self.for_stack.push(ForStatement {
+                    index: StatementIndex(self.ast.statements.len()),
+                    variable: identifier.clone(),
+                })
+            }
             self.ast.statements.push(statement);
             let token = self.next_token()?;
             match token.content {
@@ -210,31 +228,24 @@ impl<I: Iterator<Item=Token>> Parser<I> {
                 })
             },
             TokenContent::Keyword(Keyword::Next) => {
-                // TODO: This logic is wrong. It naively looks for the last FOR without accounting
-                // for nested loops.
                 let var_follows = match self.peek_token()?.content {
                     TokenContent::Identifier(_) => true,
                     _ => false,
                 };
-                if var_follows { self.expect_identifier()?; }
+                let opt_var = if var_follows { Some(self.expect_identifier()?) } else { None };
+                match self.for_stack.pop() {
+                    Some(for_statement) => {
+                        if var_follows && opt_var.unwrap().name != for_statement.variable.name {
+                            Err(Error {
+                                kind: ErrorKind::MismatchedNext(for_statement.variable),
+                                position: token.position
+                            })
+                        } else {
+                            Ok(Statement::Next { for_index: for_statement.index })
+                        }
+                    },
+                    None => Err(Error { kind: ErrorKind::UnmatchedNext, position: token.position })
 
-                let statements = &self.ast.statements;
-                let for_index = statements.into_iter().rposition(|ref statement|
-                    match **statement {
-                        Statement::For {
-                            variable: _,
-                            from: _,
-                            to: _,
-                            step: _,
-                        } => true,
-                        _ => false,
-                    });
-                match for_index {
-                    Some(index) => Ok(Statement::Next { for_index: StatementIndex(index) }),
-                    None => {
-                        return Err(
-                            Error { kind: ErrorKind::UnmatchedNext, position: token.position })
-                    }
                 }
             }
             _ => return Err(Error::unexpected_token(token, "expected statement")),
@@ -367,6 +378,7 @@ impl<I: Iterator<Item=Token>> Parser<I> {
 #[derive(Debug)]
 pub enum ErrorKind {
     DuplicateLineNumber,
+    MismatchedNext(Identifier),
     UnexpectedToken(TokenContent, String),
     UnexpectedEndOfFile,
     UnmatchedNext,
