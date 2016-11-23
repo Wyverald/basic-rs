@@ -205,8 +205,24 @@ impl<I: Iterator<Item=Token>> Parser<I> {
                 })
             },
             TokenContent::Keyword(Keyword::Input) => {
-                let variable = self.expect_identifier()?;
-                Ok(Statement::Input(variable))
+                let token = self.next_token()?;
+                match token.content {
+                    TokenContent::Identifier(name) => {
+                        let variable = Identifier { name: name, position: token.position };
+                        Ok(Statement::Input(String::new(), variable))
+                    },
+                    TokenContent::StringLiteral(s) => {
+                        let token = self.next_token()?;
+                        match token.content {
+                            TokenContent::Comma | TokenContent::Semicolon => {
+                                let variable = self.expect_identifier()?;
+                                Ok(Statement::Input(s, variable))
+                            },
+                            _ => Err(Error::unexpected_token(token, "expected Comma or Semicolon"))
+                        }
+                    }
+                    _ => Err(Error::unexpected_token(token, "expected StringLiteral or Identifier"))
+                }
             }
             TokenContent::Keyword(Keyword::For) => {
                 let variable = self.expect_identifier()?;

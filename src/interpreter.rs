@@ -80,7 +80,9 @@ impl Environment {
                     }
                 }
             },
-            &Statement::Input(ref variable) => {
+            &Statement::Input(ref string, ref variable) => {
+                print!("{}", string);
+                let is_string = variable.name.ends_with('$');
                 let val = {
                     let val: Value;
                     loop {
@@ -88,7 +90,12 @@ impl Environment {
                         io::stdout().flush().expect("toilet stuck, could not flush");
                         let mut s = String::new();
                         io::stdin().read_line(&mut s).expect("failed to read from stdin");
+
                         let trimmed = s.trim();
+                        if is_string {
+                            val = Value::String(String::from(trimmed));
+                            break;
+                        }
                         match trimmed.parse::<i32>() {
                             Ok(i) => { val = Value::Integer(i); break }
                             Err(_) => match trimmed.parse::<f64>() {

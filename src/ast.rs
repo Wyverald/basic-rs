@@ -39,7 +39,7 @@ pub enum Statement {
         then_branch: Box<Statement>,
         else_branch: Option<Box<Statement>>,
     },
-    Input(Identifier),
+    Input(String, Identifier),
     Let(Identifier, Expression),
     Next {
         for_index: StatementIndex,
